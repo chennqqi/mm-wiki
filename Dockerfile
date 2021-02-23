@@ -20,5 +20,6 @@ COPY views views
 
 RUN chown -R app:app /app
 ENV TZ=Asia/Shanghai
+EXPOSE 8080
 
 CMD [ "/app/mm-wiki", "--conf", "/app/conf/mm-wiki.conf" ]
