@@ -1,31 +1,24 @@
-FROM alpine/git
+FROM golang:1.14.7-alpine3.12
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories
+RUN apk add build-base git musl-dev
+COPY . /go/src/mm-wiki
+WORKDIR /go/src/mm-wiki
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /bin/mm-wiki
 
-ENV TZ=Asia/Shanghai
+FROM alpine:3.12
+RUN echo "https://mirror.tuna.tsinghua.edu.cn/alpine/v3.12/main" > /etc/apk/repositories && \
+	apk add --no-cache -U tzdata && \
+	addgroup -S app && \
+	adduser app -S -G app -h /app
 
 WORKDIR /app
 
-RUN git clone https://github.com/phachon/mm-wiki.git
+COPY --from=0 /bin/mm-wiki mm-wiki
+COPY static static
+COPY views views
 
+RUN chown -R app:app /app
+ENV TZ=Asia/Shanghai
 
-FROM golang:1.14.1-alpine
-
-COPY --from=0 /app/mm-wiki /app/mm-wiki
-
-WORKDIR /app/mm-wiki
-
-# 如果国内网络不好，可添加以下环境
-# RUN go env -w GO111MODULE=on
-# RUN go env -w GOPROXY=https://goproxy.cn,direct
-# RUN export GO111MODULE=on
-# RUN export GOPROXY=https://goproxy.cn
-
-RUN mkdir /opt/mm-wiki && ls /app/mm-wiki
-RUN go build -o /opt/mm-wiki/mm-wiki ./ \
-    && cp -r ./conf/ /opt/mm-wiki \
-    && cp -r ./install/ /opt/mm-wiki\
-    && cp ./scripts/run.sh /opt/mm-wiki\
-    && cp -r ./static/ /opt/mm-wiki\
-    && cp -r ./views/ /opt/mm-wiki\
-    && cp -r ./logs/ /opt/mm-wiki\
-    && cp -r ./docs/ /opt/mm-wiki
-CMD ["/opt/mm-wiki/mm-wiki", "--conf", "/opt/mm-wiki/conf/mm-wiki.conf"]
+CMD [ "/app/mm-wiki", "--conf", "/app/conf/mm-wiki.conf" ]
